@@ -1,2 +1,2 @@
 # winter_project
-This is my winter break project. The idea is to use LLMs in various ways and expand as I go.
+This is my winter break project. The plan is to create a program that gives insight on when to buy and sell stocks.
