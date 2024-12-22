@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import requests
 import sqlite3
 import ast
+import re
 
 class Scraper():
 
@@ -86,6 +87,7 @@ class Scraper():
             print(f"Error trying to summarize text: {e}")
             return None
 
+
     def pages_to_scrape(self, url) -> list[str]:
         """
         returns a list of urls within main page to scrape
@@ -124,7 +126,7 @@ class Scraper():
             urls = []
 
             for ticker in tickers_list:
-                urls.append(f"https://www.google.com/finance/quote/{ticker}:NASDAQ")
+                urls.append(f"https://www.google.com/finance/quote/{ticker}:NASDAQ?WINDOW=5D")
             
             return urls
         
@@ -133,33 +135,63 @@ class Scraper():
 
 
 
-    def scrape(self, url) -> str:
+    def scrape(self, urls) -> str:
         """
         final product - web scraper
         """
-
-        html = self.fetch(url)
-        if not html:
-            print('Failed fetch function.')
-            return None
         
-        text = self.extract(html)
-        if not text:
-            print('Failed extract function.')
-            return None
-        
-        summary = self.summarize(text)
-        if not summary:
-            print('Failed summarize function.')
-            return None
+        data = []
 
-        return summary
+        count = 0
+        for url in urls:
+            html = self.fetch(url)
+            if not html:
+                print('Failed fetch function.')
+                return None
+            
+            text = self.extract(html)
+            if not text:
+                print('Failed extract function.')
+                return None
+
+            summary = self.summarize(text)
+            data.append(summary)
+            count += 1
+            print(f"{count}/{len(urls)}")
+            if not summary:
+                print('Failed summarize function.')
+                return None
+
+        return data
+
+    def parse(self, raw_data):
+        """
+        parses scraped data for database insertion
+        """
+
+        clean_data = []
+        try:
+            for data_string in raw_data:
+                #clean up each string
+                clean_string = data_string.replace('\\n', '').replace('\\', '')
+                clean_string = re.sub(r'"\s+', '', clean_string)
+
+                # convert into string representation of tuples into list
+                parsed_list = eval(clean_string)
+                clean_data.extend(parsed_list)
+            
+            return clean_data
+        
+        except Exception as e:
+            print(f"Error parsing data: {e}")
+            return None
 
 
     def create_database(self) -> bool:
         """
         creates database for storing stocks info
         """
+
         try:
             # connect to database and create cursor
             con = sqlite3.connect('stocks.db')
@@ -187,30 +219,32 @@ class Scraper():
             return None
          
 
-    def insert_to_database(self, url) -> bool:
+    def insert_to_database(self) -> bool:
         """
         inserts scraped data into the database
         """
-        
+            
+        raw_data = self.scrape(urls)
+        parsed_data = self.parse(raw_data)
+                    
+        # connect to database
         try:
-            scraped_data = self.scrape(url)
-            data = ast.literal_eval(scraped_data)
-
             con = sqlite3.connect('stocks.db')
             cur = con.cursor()
 
-            # cur.execute('DELETE FROM stocks')
-
-            cur.executemany('INSERT INTO stocks VALUES(?, ?, ?, ?)', data)
+            cur.executemany("""
+            INSERT INTO stocks (ticker, name, change, time_window)
+            VALUES (?, ?, ?, ?)
+            """, parsed_data)
 
             con.commit()
             cur.close()
             con.close()
 
             return True
-        
-        except Exception as e:
-            print(f"Error trying to insert into database: {e}")
+    
+        except sqlite3.Error as e:
+            print(f"SQLite error: {e}")
             return None
 
 

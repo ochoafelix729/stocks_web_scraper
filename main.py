@@ -12,6 +12,15 @@ if __name__ == '__main__':
     # print(main.create_database())
     # print(main.insert_to_database('https://www.google.com/finance/markets/most-active'))
     # print(main.run())
-    print(main.pages_to_scrape('https://www.google.com/finance/markets/most-active'))
+
+    urls = main.pages_to_scrape('https://www.google.com/finance/markets/most-active')
+    print(urls)
+
+    # print(main.create_database())
+    # print(main.insert_to_database())
+    
+
+    # raw_data = main.scrape(urls)
+    # print(main.parse(raw_data))
 
 
