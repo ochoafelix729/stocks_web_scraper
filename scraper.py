@@ -20,7 +20,6 @@ class Scraper():
 
         #connect to openai
         self.openai = OpenAI()
-        
         self.model = 'gpt-4o-mini'
 
 
@@ -32,6 +31,7 @@ class Scraper():
         try:
             response = requests.get(url)
             response.raise_for_status()
+
             return response.text
     
         except Exception as e:
@@ -52,6 +52,7 @@ class Scraper():
                 trash.extract()
             text = soup.get_text(separator='\n')
             lines = [line.strip() for line in text.splitlines() if line.strip()]
+
             return '\n'.join(lines)
         
         except Exception as e:
@@ -66,7 +67,16 @@ class Scraper():
 
         return [
             {'role': 'system', 'content': 'You are a helpful assistant for summarizing stock changes in text.'},
-            {'role': 'user', 'content': f"Summarize the stock changes in this text. Focus only on the changes in different stocks (give me the numbers). Avoid any unnessecary details that are unrelated to stocks. Give me the results as a list of tuples in python that I can insert into an SQL table with 4 columns: ticker, name, % change, and time window (day, week, etc.). Also, do not include the ```python at the beginning nor the ``` at the end. Don't name the list either. Simple give me the data. \n\n {text}."}
+            {'role': 'user', 'content': (
+            "Summarize the stock change of the main stock in question in this text. It should be the first stock you see. "
+            "The stock change in question should have a percentage associated with it (but only give me the number (e.g., 11.54, -10.2, etc.)), "
+            "and it's highlighted on the web view. "
+            "Only give me the numbers and time windows (e.g., 1 day or 5 days). 'After Hours' is not on of the options. "
+            "Give me the results as a list of tuples in Python that can be inserted into an SQL table "
+            "with 4 columns: ticker, name, percent change, and time window. Do not include the ```python at the beginning nor "
+            "the ``` at the end. Do not name the list; simply give me the data.\n\n"
+            f"{text}.")
+            }
         ]
 
 
@@ -111,7 +121,12 @@ class Scraper():
 
         messages = [
             {'role': 'system', 'content': 'You are a helpful assistant for gathering the tickers of all stocks on a webpage.'},
-            {'role': 'user', 'content': f"Please provide me with a python list including all the stock tickers on this webpage (NVDA, PLTR, etc.). Also, do not include the ```python at the beginning nor the ``` at the end. Don't name the list either. Simply give me the data.\n\n{text}"}
+            {'role': 'user', 'content': (
+            "Please provide me with a Python list including all the stock tickers on this webpage (NVDA, PLTR, etc.). "
+            "Also, do not include the ```python at the beginning nor the ``` at the end. Don't name the list either. "
+            "Simply give me the data.\n\n"
+            f"{text}")
+            }
         ]
 
         try:
@@ -126,7 +141,8 @@ class Scraper():
             urls = []
 
             for ticker in tickers_list:
-                urls.append(f"https://www.google.com/finance/quote/{ticker}:NASDAQ?WINDOW=5D")
+                # urls.append(f"https://www.google.com/finance/quote/{ticker}:NASDAQ")
+                urls.append(f"https://www.google.com/finance/quote/{ticker}:NASDAQ?window=5D")
             
             return urls
         
@@ -157,6 +173,13 @@ class Scraper():
             summary = self.summarize(text)
             data.append(summary)
             count += 1
+            print(url)
+            print(summary)
+
+            if count == 4:
+                break
+
+
             print(f"{count}/{len(urls)}")
             if not summary:
                 print('Failed summarize function.')
@@ -164,7 +187,7 @@ class Scraper():
 
         return data
 
-    def parse(self, raw_data):
+    def parse(self, raw_data) -> list[tuple]:
         """
         parses scraped data for database insertion
         """
@@ -172,7 +195,7 @@ class Scraper():
         clean_data = []
         try:
             for data_string in raw_data:
-                #clean up each string
+                # clean up each string
                 clean_string = data_string.replace('\\n', '').replace('\\', '')
                 clean_string = re.sub(r'"\s+', '', clean_string)
 
@@ -216,14 +239,14 @@ class Scraper():
         
         except Exception as e:
             print(f"Error trying to create database: {e}")
-            return None
+            return False
          
 
-    def insert_to_database(self) -> bool:
+    def insert_to_database(self, urls) -> bool:
         """
         inserts scraped data into the database
         """
-            
+
         raw_data = self.scrape(urls)
         parsed_data = self.parse(raw_data)
                     
@@ -244,7 +267,27 @@ class Scraper():
             return True
     
         except sqlite3.Error as e:
-            print(f"SQLite error: {e}")
-            return None
+            print(f"Error trying to insert into database: {e}")
+            return False
+    
+
+    def reset_database(self) -> bool:
+        """
+        clears all data from stocks table
+        """
+
+        try:
+            con = sqlite3.connect('stocks.db')
+            cur = con.cursor()
+            cur.execute('DELETE FROM stocks')
+            con.commit()
+            cur.close()
+            con.close()
+            return True
+        
+        except sqlite3.Error as e:
+            print(f"Error trying to reset database: {e}")
+            return False
+
 
 
