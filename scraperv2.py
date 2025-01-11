@@ -3,6 +3,14 @@ import time
 from selenium.webdriver.common.by import By
 from typing import Any
 
+class Scraperv2():
+
+    def __init__(self):
+        pass
+    
+    def scrape(self):
+        
+
 # executable_path = 'Users/ochoa/Downloads/edgedriver_arm64'
 
 driver = webdriver.Edge()
@@ -43,8 +51,28 @@ for entry in stocks_data:
     values.append(parts[2])
     percent_changes.append(parts[4])
 
-print(tickers, stocks_names, values, percent_changes)
+# print(f"tickers: {tickers}\n\n")
+# print(f"names: {stocks_names}\n\n")
+# print(f"values: {values}\n\n")
+# print(f"percent changes: {percent_changes}")
 
+
+
+
+data = []
+
+
+for ticker, name, value, percent in zip(tickers, stocks_names, values, percent_changes):
+    data_point = {
+        "ticker": ticker,
+        "name": name,
+        "value": value,
+        "percent_change": percent
+    }
+    data.append(data_point)
+
+for i in range(3):
+    print(f"{data[i]}\n\n")
 
 
 # print(tickers)
